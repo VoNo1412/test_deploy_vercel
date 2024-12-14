@@ -31,8 +31,11 @@ const storage = multer.diskStorage({
 const upload = multer({ storage });
 
 // Middleware và cấu hình EJS
-app.use(express.static('public'));
-app.set('view engine', 'ejs');
+// app.use(express.static('public'));
+// app.set('view engine', 'ejs');
+app.set("views", __dirname + "/views");
+app.set("view engine", "ejs");
+app.use(express.static(__dirname + "public"));
 
 // Trang chính
 app.get('/', (req, res) => {
