@@ -1,0 +1,211 @@
+<%- include('partials/navbar') %>
+<h1>SCREEN SHOT</h1>
+    <!-- Form Upload -->
+    <form id="uploadForm" action="/upload" method="post" enctype="multipart/form-data">
+        <label for="fileUpload">Upload Excel File:</label>
+        <input type="file" name="fileUpload" id="fileUpload" required>
+        <button type="submit">Submit Screenshot</button>
+        <!-- <button type="button" id="stopButton"
+            style="background-color: red; color: white; margin-left: 10px;">Stop</button>
+
+        <button type="button" id="startButton"
+            style="background-color: blue; color: white; margin-left: 10px;">Start</button> -->
+            <button type="button" id="cleanUpButton" 
+            style="background-color: green; color: white; margin-left: 10px;">
+            Reload Page
+        </button>
+    </form>
+
+    <!-- Pie Chart -->
+    <div id="pieChartContainer">
+        <canvas id="pieChart"></canvas>
+    </div>
+
+    <!-- Loading Message -->
+    <div id="loadingMessage"></div>
+
+    <!-- Preview Images and Links -->
+    <table class="image-table" id="imageTable">
+        <thead>
+            <tr>
+                <th>Preview</th>
+                <th>Product Link</th>
+            </tr>
+        </thead>
+        <tbody id="imageTableBody">
+            <!-- Images and Links will be dynamically added here -->
+        </tbody>
+    </table>
+
+    <div id="successMessage"
+        style="display: none; background-color: #7cb25f; color: white; padding: 10px; margin-top: 20px;">
+        <p id="successText"></p>
+        <button id="downloadBtn" class="download-btn"
+            onclick="window.location.href='/downloadFolder'">Download Folder</button>
+    </div>
+    <!-- Modal to display larger image -->
+    <div id="imageModal" class="modal">
+        <span class="close">&times;</span>
+        <img class="modal-content" id="modalImage">
+        <div id="caption"></div>
+    </div>
+    <!-- Socket.io Script -->
+    <script src="/socket.io/socket.io.js"></script>
+    <!-- Bootstrap JS and dependencies -->
+    <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.9.3/dist/umd/popper.min.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+    <script>
+          // Add event listener to the Clean Up button
+    document.getElementById('cleanUpButton').addEventListener('click', function () {
+        // Redirect to /clean_up_folder and reload the page
+        fetch('/clean_up_folder', {
+            method: 'GET'
+        })
+        
+        location.reload();
+    })
+        const socket = io();
+
+        // Default Pie Chart with 0% processed and 100% remaining
+        const ctx = document.getElementById('pieChart').getContext('2d');
+        let processedCount = 0; // Tracks the number of processed files
+        let totalFiles = 0; // Tracks the total number of files
+
+        const pieData = {
+            labels: ['Processed', 'Remaining'],
+            datasets: [{
+                data: [0, 100], // 0% processed, 100% remaining
+                backgroundColor: ['#4caf50', '#638ed4'],
+                borderColor: ['#4caf50', '#638ed4'],
+                borderWidth: 1
+            }]
+        };
+
+        const pieChart = new Chart(ctx, {
+            type: 'pie',
+            data: pieData,
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: {
+                        position: 'top',
+                    },
+                    tooltip: {
+                        enabled: true
+                    }
+                }
+            }
+        });
+
+
+        socket.on("uploadStatus", data => {
+            document.getElementById('loadingMessage').innerHTML = `<h1>${data.message}</h1>`;
+        })
+
+        // Listen to progress update from the server
+        socket.on('updateProgress', (data) => {
+            totalFiles = data.totalFiles;
+            const processedFiles = data.processedFiles;
+
+            // Hide loading message once progress starts
+
+            // Update the pie chart
+            processedCount += 1; // Increment processed count for each new file processed
+            const remainingFiles = totalFiles - processedCount;
+
+            pieChart.data.datasets[0].data = [processedCount, remainingFiles];
+            pieChart.update();
+
+            // Update table with processed images and links
+            const tableBody = document.getElementById('imageTableBody');
+            const newRow = document.createElement('tr');
+
+            // Check if the imagePath is valid and exists
+            const imageUrl = processedFiles.imagePath ? processedFiles.imagePath : 'path/to/default/image.jpg'; // fallback image if url is invalid
+
+            newRow.innerHTML = ` 
+                <td><img src="${imageUrl}" class="image-preview" alt="Preview"></td>
+                <td><a href="${processedFiles.productLink}" target="_blank">${processedFiles.productLink}</a></td>
+            `;
+            tableBody.appendChild(newRow);
+        });
+
+        // Listen to the success_render event from the server
+        socket.on('success_render', (data) => {
+            // Get the success message from the server
+            const successMessage = data.message;
+
+            // Update the success message text
+            const successText = document.getElementById('successText');
+            successText.textContent = successMessage;
+
+            // Show the success message container
+            const successMessageContainer = document.getElementById('successMessage');
+            successMessageContainer.style.display = 'block';
+        });
+
+        // Prevent form reload and handle AJAX submission
+        const uploadForm = document.getElementById('uploadForm');
+        uploadForm.addEventListener('submit', function (event) {
+            event.preventDefault(); // Prevent page reload
+
+            // Create a FormData object
+            const formData = new FormData(uploadForm);
+
+            // Send form data using fetch (AJAX)
+            fetch('/upload', {
+                method: 'POST',
+                body: formData
+            })
+                .then(response => response.json())
+                .then(data => {
+                    console.log('Upload successful:', data);
+                })
+                .catch(error => {
+                    console.error('Upload error:', error);
+                });
+        });
+
+        // Modal functionality to display clicked image
+        const modal = document.getElementById('imageModal');
+        const modalImage = document.getElementById('modalImage');
+        const captionText = document.getElementById('caption');
+
+        // Add event listener to images in the table
+        document.getElementById('imageTable').addEventListener('click', function (event) {
+            if (event.target && event.target.classList.contains('image-preview')) {
+                modal.style.display = 'block';
+                modalImage.src = event.target.src;
+                captionText.innerHTML = event.target.alt;
+            }
+        });
+
+        // Close modal when clicking on the 'x'
+        const span = document.getElementsByClassName('close')[0];
+        span.onclick = function () {
+            modal.style.display = 'none';
+        }
+
+        // Biến để theo dõi trạng thái stop
+        let isStopped = false;
+
+        // Xử lý khi nhấn nút Stop
+        document.getElementById('stopButton').addEventListener('click', function () {
+            isStopped = true; // Đặt trạng thái dừng
+            socket.emit('stopProcess'); // Gửi tín hiệu đến server
+            alert('Processing stopped!');
+        });
+
+        // Xử lý khi nhấn nút Start
+        document.getElementById('startButton').addEventListener('click', function () {
+            isStopped = false; // Đặt trạng thái dừng
+            socket.emit('startProcess'); // Gửi tín hiệu đến server
+            alert('Processing started!');
+        });
+
+
+    </script>
+    </body>
+
+    </html>
