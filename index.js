@@ -97,7 +97,8 @@ io.on('connection', (socket) => {
 
 app.post('/upload', upload.single('fileUpload'), async (req, res) => {
     try {
-        const filePath = req.file.path;
+        // const filePath = req.file.path;
+        const filePath = path.join(__dirname, 'uploads', 'data.txt');
         const fileExt = path.extname(filePath).toLowerCase();
         let data = []; // Mảng lưu dữ liệu từ file (Excel hoặc TXT)
 
@@ -196,7 +197,9 @@ app.post('/upload', upload.single('fileUpload'), async (req, res) => {
 
 app.post('/upload_react', upload.single('fileUpload'), async (req, res) => {
     try {
-        const filePath = req.file.path;
+        // const filePath = req.file.path;
+        const filePath = path.join(__dirname, 'uploads', 'data.txt');
+
         const fileExt = path.extname(filePath).toLowerCase();
         let data = []; // Mảng lưu dữ liệu từ file (Excel hoặc TXT)
 
